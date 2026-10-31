@@ -44,6 +44,35 @@ router = create_stream_router(price_cache)  # Returns FastAPI APIRouter
 
 Default tickers: AAPL, GOOGL, MSFT, AMZN, TSLA, NVDA, META, JPM, V, NFLX. Seed prices and per-ticker volatility/drift params are in `app/market/seed_prices.py`.
 
+## Application (API, DB, Chat)
+
+Entry point: `app.main:app` (`uv run uvicorn app.main:app --port 8000`). `create_app()` accepts
+`db_path`, `market_source`, `price_cache`, `snapshot_interval`, `enable_background_tasks` for tests.
+
+| Module | Purpose |
+|--------|---------|
+| `app/database.py` | `Database` — lazy init: runs `db/schema.sql` always, `db/seed.sql` only on a fresh DB |
+| `app/portfolio.py` | `execute_trade`, `get_portfolio` (P&L, weights), `record_snapshot`, `get_history` |
+| `app/services.py` | `TradingService` — watchlist add/remove (keeps market source in sync), trade + snapshot, 30s snapshot loop |
+| `app/llm.py` | `LLMResponse` schema, `parse_llm_response`, `mock_llm_response` (LLM_MOCK), `call_llm` (LiteLLM → OpenRouter/Cerebras) |
+| `app/chat.py` | `handle_chat` — context + history → LLM → auto-execute actions → persist |
+| `app/main.py` | FastAPI app, routes, lifespan (starts market source + snapshot task), static files from `backend/static` |
+
+Env vars: `FINALLY_DB_PATH` (default `<repo>/db/finally.db`), `FINALLY_STATIC_DIR` (default
+`backend/static`), `LLM_MOCK`, `OPENROUTER_API_KEY`, `MASSIVE_API_KEY`. `.env` at repo root is loaded.
+
+Endpoints: `GET /api/health`, `GET /api/portfolio`, `POST /api/portfolio/trade` `{ticker, quantity, side}`
+(400 on validation failure), `GET /api/portfolio/history` → `{snapshots: [{total_value, recorded_at}]}`,
+`GET /api/watchlist` → `{tickers: [...]}`, `POST /api/watchlist` `{ticker}` (201; 409 duplicate),
+`DELETE /api/watchlist/{ticker}` (404 if absent), `POST /api/chat` `{message}` →
+`{message, trades: [...status], watchlist_changes: [...status]}`, `GET /api/chat/history`,
+`GET /api/stream/prices` (SSE).
+
+Mock LLM understands: "buy 10 AAPL", "sell 5 shares of TSLA", "add PYPL", "remove NFLX".
+
+Docker note: place the backend at `/app/backend` and mount the volume at `/app/db` so the
+default DB path resolves and `backend/db/*.sql` is not shadowed by the volume.
+
 ## Running Tests
 
 ```bash
