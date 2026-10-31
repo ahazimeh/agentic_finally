@@ -1,0 +1,8 @@
+# OpenRouter API key for LLM chat (leave empty when using mock mode)
+OPENROUTER_API_KEY=
+
+# Optional: Massive (Polygon.io) API key for real market data; empty = built-in simulator
+MASSIVE_API_KEY=
+
+# Deterministic mock LLM responses (no API key needed)
+LLM_MOCK=true
